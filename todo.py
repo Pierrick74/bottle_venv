@@ -1,7 +1,9 @@
 import sqlite3
 from bottle import Bottle, template
-from bottle import request
+from bottle import (request)
 from bottle import redirect
+
+from bottle import default_app
 
 app = Bottle()
 
@@ -76,4 +78,4 @@ def task_as_json(number):
         return {'id': result[0], 'task': result[1], 'status': result[2]}
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8080, debug=True)
+    application = default_app()
