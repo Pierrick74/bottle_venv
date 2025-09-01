@@ -1,11 +1,16 @@
+import git
 import sqlite3
-from bottle import Bottle, template
+import os
+
+
+from bottle import Bottle, template, run
 from bottle import (request)
 from bottle import redirect
 
 from bottle import default_app
 
 app = Bottle()
+db_path = os.path.join(os.path.dirname(__file__), 'todo.db')
 
 @app.route('/')
 def index():
@@ -25,7 +30,7 @@ def todo_list():
         case _:
             return template('message.tpl',
                 message = 'Wrong query parameter: show must be either open, closed or all.')
-    with sqlite3.connect('todo.db') as connection:
+    with sqlite3.connect(db_path) as connection:
         cursor = connection.cursor()
         cursor.execute(db_query)
         result = cursor.fetchall()
@@ -36,7 +41,7 @@ def todo_list():
 def new_task():
     if request.POST:
         new_task = request.forms.task.strip()
-        with sqlite3.connect('todo.db') as connection:
+        with sqlite3.connect(db_path) as connection:
             cursor = connection.cursor()
             cursor.execute("INSERT INTO todo (task,status) VALUES (?,?)", (new_task, 1))
             new_id = cursor.lastrowid
@@ -54,13 +59,13 @@ def edit_task(number):
             status = 1
         else:
             status = 0
-        with sqlite3.connect('todo.db') as connection:
+        with sqlite3.connect(db_path) as connection:
             cursor = connection.cursor()
             cursor.execute("UPDATE todo SET task = ?, status = ? WHERE id LIKE ?", (new_data, status, number))
         return template('message.tpl',
             message=f'The task number {number} was successfully updated')
     else:
-        with sqlite3.connect('todo.db') as connection:
+        with sqlite3.connect(db_path) as connection:
             cursor = connection.cursor()
             cursor.execute("SELECT task FROM todo WHERE id LIKE ?", (number,))
             current_data = cursor.fetchone()
@@ -68,7 +73,7 @@ def edit_task(number):
 
 @app.route('/as_json/<number:re:[0-9]+>')
 def task_as_json(number):
-    with sqlite3.connect('todo.db') as connection:
+    with sqlite3.connect(db_path) as connection:
         cursor = connection.cursor()
         cursor.execute("SELECT id, task, status FROM todo WHERE id LIKE ?", (number,))
         result = cursor.fetchone()
@@ -77,5 +82,18 @@ def task_as_json(number):
     else:
         return {'id': result[0], 'task': result[1], 'status': result[2]}
 
+@app.route('/update_server')
+def update_server():
+    try:
+        repo = git.Repo('/home/pierrickviret74/bottle_venv')
+        origin = repo.remotes.origin
+        origin.pull()
+        return template('message.tpl', message='Server updated successfully!')
+    except Exception as e:
+        return template('message.tpl', message=f'Update failed: {str(e)}')
+
+
+application = app
+
 if __name__ == '__main__':
-    application = default_app()
+    run(app, host='localhost', port=8080)
