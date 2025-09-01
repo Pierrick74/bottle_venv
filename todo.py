@@ -1,7 +1,5 @@
 import git
-
 import os
-
 import sqlite3
 
 from bottle import Bottle, template, run
