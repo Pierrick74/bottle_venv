@@ -5,8 +5,10 @@ import sqlite3
 from bottle import Bottle, template, run
 from bottle import (request)
 from bottle import redirect
+from bottle import TEMPLATE_PATH
+import os
 
-from bottle import default_app
+TEMPLATE_PATH.append(os.path.join(os.path.dirname(__file__), 'views'))
 
 app = Bottle()
 db_path = os.path.join(os.path.dirname(__file__), 'todo.db')
