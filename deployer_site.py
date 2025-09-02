@@ -42,66 +42,56 @@ else:
 """
 
 
-def execute_remote_script(username, api_token, script_path):
-    # Test de différentes APIs PythonAnywhere
-    
-    # 1. Essayer l'API scheduled tasks
-    print("Tentative 1: API scheduled tasks...")
-    scheduled_url = f"https://www.pythonanywhere.com/api/v0/user/{username}/scheduled/"
-    task_data = {
-        "command": f"python3.10 {script_path}",
-        "enabled": True,
-        "interval": "daily",
+def execute_remote_script(username, api_token, script_name):
+    host = "www.pythonanywhere.com"
+    headers = {'Authorization': f'Token {api_token}'}
+
+    # 1. Créer une nouvelle console
+    console_url = f"https://{host}/api/v0/user/{username}/consoles/"
+    console_data = {
+        "executable": "python3.10",
+        "arguments": "",
+        "working_directory": "/home/pierrickviret74/"
     }
+
+    response = requests.post(console_url, headers=headers, json=console_data)
+    console_info = response.json()
+    console_id = console_info['id']
+    print(f"Console créée avec ID: {console_id}")
+
+    # Attendre que la console soit prête
+    import time
+    print("Attente de l'initialisation de la console...")
+    time.sleep(10)
+
+    # 2. Envoyer la commande pour exécuter le script
+    input_url = f"https://{host}/api/v0/user/{username}/consoles/{console_id}/send_input/"
+    command_data = {"input": f"python3.10 {script_name}\n"}
+
+    response = requests.post(input_url, headers=headers, json=command_data)
+    print("Commande envoyée")
+
+    # 3. Récupérer le résultat
+    import time
+    time.sleep(10)  # Attendre l'exécution
+
+    output_url = f"https://{host}/api/v0/user/{username}/consoles/{console_id}/get_latest_output/"
+    response = requests.get(output_url, headers=headers)
+    print("Sortie du script:")
     
-    resp = requests.post(
-        scheduled_url,
-        json=task_data,
-        headers={"Authorization": f"Token {api_token}"}
-    )
-    
-    if resp.status_code in (200, 201):
-        print("✅ Tâche programmée créée avec succès")
-        return
-    else:
-        print(f"❌ Scheduled tasks: {resp.status_code}")
-        
-    # 2. Essayer l'API CPU seconds / always on tasks
-    print("Tentative 2: API always on tasks...")
-    always_on_url = f"https://www.pythonanywhere.com/api/v0/user/{username}/always_on_tasks/"
-    
-    resp = requests.get(
-        always_on_url,
-        headers={"Authorization": f"Token {api_token}"}
-    )
-    
-    if resp.status_code == 200:
-        print("✅ API always on disponible")
-        # Créer une tâche always on temporaire
-        task_data = {
-            "command": f"python3.10 {script_path}",
-            "enabled": True,
-            "description": "Git sync task"
-        }
-        
-        resp = requests.post(
-            always_on_url,
-            json=task_data,
-            headers={"Authorization": f"Token {api_token}"}
-        )
-        
-        if resp.status_code in (200, 201):
-            print("✅ Tâche always on créée")
-            return
+    try:
+        output_data = response.json()
+        if 'output' in output_data:
+            print(output_data['output'])
         else:
-            print(f"❌ Erreur création always on: {resp.status_code}")
-    else:
-        print(f"❌ Always on tasks: {resp.status_code}")
-    
-    # 3. Fallback: juste dire à l'utilisateur
-    print("⚠️  Aucune API d'exécution trouvée")
-    print(f"📋 Script créé: {script_path}")
-    print("🔗 Connectez-vous à PythonAnywhere et exécutez manuellement")
+            print(f"Response keys: {list(output_data.keys())}")
+            print(f"Full response: {output_data}")
+    except requests.exceptions.JSONDecodeError:
+        print(f"Non-JSON response: {response.text}")
+        print(f"Status code: {response.status_code}")
+
+    # 4. Fermer la console (optionnel)
+    requests.delete(f"https://{host}/api/v0/user/{username}/consoles/{console_id}/", headers=headers)
 
 def main():
     username = 'pierrickviret74'
@@ -184,7 +174,7 @@ def main():
         )
         if resp.status_code in (200, 201):
             print(f"Script uploadé avec succès, exécution...")
-            execute_remote_script(username, api_token, f"/home/{username}/{git_script_filename}")
+            execute_remote_script(username, api_token, "gitnewscript.py")
         else:
             print(f"Erreur upload script: {resp.status_code}")
 
@@ -242,9 +232,6 @@ def main():
 
     site_url = f"https://{site_hostname}/"
     print(f"All done!  The site is now live at {site_url}")
-
-
-
 
 if __name__ == "__main__":
     main()
